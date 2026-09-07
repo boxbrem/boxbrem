@@ -3,7 +3,7 @@ class_name MinaTerrestre
 ## Node2D com Sprite2D e Marker2D chamado pega, posicionado no ponto de contato da mão.
 signal explodiu(posicao: Vector2)
 signal liberou_mao(mina: Node2D)
-signal armada
+signal mina_armada
 const EfeitoExplosao = preload("res://scripts/armas/efeito_explosao_granada.gd")
 
 @export_category("Inventário")
@@ -45,7 +45,7 @@ const EfeitoExplosao = preload("res://scripts/armas/efeito_explosao_granada.gd")
 var guardada: bool = false
 var na_mao: bool = false
 var lancada: bool = false
-var armada: bool = false
+var esta_armada: bool = false
 var detonada: bool = false
 var tempo_armadura_restante: float = 0.0
 var dono: Node2D
@@ -118,7 +118,7 @@ func get_slot_equipamento() -> StringName:
 	return &"extra"
 
 func pode_ser_coletada() -> bool:
-	return not guardada and not na_mao and not lancada and not armada and not detonada
+	return not guardada and not na_mao and not lancada and not esta_armada and not detonada
 
 func _entrou(corpo: Node2D) -> void:
 	if pode_ser_coletada() and corpo.has_method("registrar_arma_proxima"):
@@ -136,7 +136,7 @@ func _desativar_coleta() -> void:
 		area.set_deferred("monitoring", false)
 
 func _inimigo_entrou(corpo: Node2D) -> void:
-	if armada and not detonada and corpo != lancador:
+	if esta_armada and not detonada and corpo != lancador:
 		if inimigos_detectados.find(corpo) == -1:
 			inimigos_detectados.append(corpo)
 			_explodir()
@@ -160,7 +160,7 @@ func pode_empunhar() -> bool:
 	if not is_instance_valid(ponto_pega):
 		push_warning("Mina: adicione o Marker2D pega no ponto de contato da mão.")
 		return false
-	return guardada and not na_mao and not armada and not detonada
+	return guardada and not na_mao and not esta_armada and not detonada
 
 func empunhar(jogador: Node2D) -> bool:
 	if not pode_empunhar() or jogador != dono or not jogador.has_method("fixar_m1"):
@@ -178,7 +178,7 @@ func empunhar(jogador: Node2D) -> bool:
 	return true
 
 func recolher(deposito: Node2D) -> bool:
-	if not na_mao or armada or not is_instance_valid(deposito):
+	if not na_mao or esta_armada or not is_instance_valid(deposito):
 		return false
 	_soltar_mao_visual()
 	na_mao = false
@@ -215,7 +215,7 @@ func _atualizar_na_mao() -> void:
 		lancador.call("_atualizar_maos", 0.0)
 
 func lancar(jogador: Node2D, alvo: Vector2) -> bool:
-	if not na_mao or armada or detonada or jogador != lancador:
+	if not na_mao or esta_armada or detonada or jogador != lancador:
 		return false
 	var vetor: Vector2 = alvo - global_position
 	var direcao: Vector2 = vetor.normalized() if vetor.length_squared() > 0.01 else Vector2.DOWN
@@ -244,7 +244,7 @@ func _liberar_para_voo() -> void:
 	liberou_mao.emit(self)
 
 func dropar(novo_pai: Node, posicao_no_mundo: Vector2) -> bool:
-	if not guardada or na_mao or armada or detonada or not is_instance_valid(novo_pai):
+	if not guardada or na_mao or esta_armada or detonada or not is_instance_valid(novo_pai):
 		return false
 	guardada = false
 	dono = null
@@ -272,7 +272,7 @@ func _physics_process(delta: float) -> void:
 			_atualizar_na_mao()
 	
 	# Período de armadura
-	if armada and tempo_armadura_restante > 0.0:
+	if esta_armada and tempo_armadura_restante > 0.0:
 		tempo_armadura_restante -= delta
 		if tempo_armadura_restante <= 0.0:
 			# Mina foi armada e passou pelo tempo de armadura
@@ -324,13 +324,13 @@ func _physics_process(delta: float) -> void:
 	queue_redraw()
 
 func _armar_mina() -> void:
-	if armada or detonada or not lancada:
+	if esta_armada or detonada or not lancada:
 		return
 	lancada = false
-	armada = true
+	esta_armada = true
 	tempo_armadura_restante = tempo_armadura
 	area_deteccao.set_deferred("monitoring", true)
-	armada.emit()
+	mina_armada.emit()
 	if sprite != null and sprite.is_connected("animation_finished", Callable()):
 		# Pode adicionar animação de armadura aqui se necessário
 		pass
@@ -361,7 +361,7 @@ func _explodir() -> void:
 	if detonada:
 		return
 	detonada = true
-	armada = false
+	esta_armada = false
 	lancada = false
 	area_deteccao.set_deferred("monitoring", false)
 	if is_instance_valid(sprite):
